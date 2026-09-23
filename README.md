@@ -1,5 +1,7 @@
 # Isaacsim_pick_place
 
+![시연 영상](docs/pick_place.gif)
+
 Isaac Sim 위에서 Franka Panda 로봇으로 물체를 인식하고 집어서(pick) 다른 위치에 놓는(place) ROS 2 패키지입니다. MoveIt 2 기반 모션 계획과 `ros2_control`(`topic_based_ros2_control`)을 통해 Isaac Sim과 통신합니다.
 
 ## 구성
@@ -65,6 +67,38 @@ ros2 run panda_pick_place pick_and_place --ros-args \
   -p use_sim_time:=true \
   -p place_dx:=0.1
 ```
+
+### 4. 장면 설명 (`scene_describer`, 선택)
+
+카메라 영상을 Ollama의 비전 모델로 보내 장면에 어떤 물체가 있는지 설명받을 수 있습니다. 먼저 Ollama 서버를 띄우고 모델을 받아야 합니다.
+
+```bash
+ollama serve                 # 별도 터미널에서 계속 실행 중이어야 함
+ollama pull gemma3:4b        # 최초 1회
+```
+
+그 다음 노드를 실행합니다.
+
+```bash
+ros2 run panda_pick_place scene_describer --ros-args \
+  -p model:=gemma3:4b \
+  -p image_topic:=/rsd455/color/image_raw \
+  -p max_width:=320 \
+  -p describe_period:=30.0 \
+  -p timeout:=120.0 \
+  -p prompt:="List the objects on the table. For each, give its color, position (left/center/right), and shape. Be concise."
+```
+
+`describe_period`마다(또는 `/describe_trigger` 토픽으로 즉시) 카메라 프레임 1장을 모델에 보내고, 결과를 `/scene_description`(String)으로 발행합니다. 예시 출력:
+
+```
+Here's a breakdown of the objects visible in the image:
+- **Black Cube:** Center, Cube
+- **Black Cube:** Left, Cube
+- **Red Cube:** Right, Cube
+```
+
+> 첫 요청은 모델 로딩 때문에 응답이 느릴 수 있습니다(GPU 없이 CPU로 돌리면 특히). 로그에 `이전 요청 처리 중 — 건너뜀`이 반복되면 아직 첫 응답을 기다리는 중일 가능성이 높으니, `ollama run gemma3:4b`로 별도 테스트해 응답 속도를 먼저 확인해보세요.
 
 ## 주요 파라미터
 
